@@ -1,0 +1,1 @@
+worker:  forever start --minUptime 300000 --spinSleepTime 100000 -a -o out.log -e err.log index.js -f
