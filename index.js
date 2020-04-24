@@ -1,7 +1,6 @@
 //require puppeteer
 const puppeteer = require("puppeteer");
 const {MongoClient} = require('mongodb');
-const cron = require("node-cron");
 require("dotenv").config();
 let nodeMailer = require("nodemailer");
 let EmailTemplate = require('email-templates').EmailTemplate;
@@ -15,14 +14,15 @@ let messageId = messageIdPrefix + '@gmail.com';
 const couponsPage = "https://udemycoupon.learnviral.com/coupon-category/free100-discount/";
 
 
+
+
 //get browser instance
 async function getBrowser() {
     const browser = await puppeteer.launch({
         headless: true,
         args: ['--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--single-process'
+
         ]
     });
     return browser;
@@ -31,16 +31,12 @@ async function getBrowser() {
 //scrape url on first page
 async function scrapeFreeCouponUrls(browser) {
     //stores all urls
-    const allLinks = [];
     const page = await browser.newPage();
     await page.goto(couponsPage);
     console.log("Urls are being scraped");
     const allUrls = await page.$$eval('.entry-title > a', links => links.map(link => link.href));
-    for (let aUrl of allUrls) {
-        allLinks.push(aUrl);
-        console.log("Links:", aUrl);
-    }
-    return allLinks;
+    console.log("ALL URLS",allUrls)
+     return allUrls;
     try {
 
     } catch (e) {
@@ -110,7 +106,7 @@ function sendmail(email, udemyUrls) {
             },
             subject: 'NEW FREE UDEMY COURSES',
         }, {
-            token: udemyUrls
+                udemyUrls: udemyUrls
         }, function (err, info) {
             if (err) {
 
@@ -133,7 +129,7 @@ async function main() {
 
         if (urls.length === 0) {
             console.log("no new links so we terminate the programme");
-            //  await process.exit();
+            await process.exit();
 
 
         } else {
@@ -142,12 +138,11 @@ async function main() {
             for (let name of process.env.emailClients.split(',')) {
                 console.log("Sending email to:", name);
                 sendmail(name ,urls );
-                // await new Promise(resolve => setTimeout(resolve, 1000));
 
             }            ;
 
             console.log("Waiting before terminating emails closing smtp");
-            //await process.exit();
+           // await process.exit();
         }
 
     } catch (e) {
@@ -155,8 +150,4 @@ async function main() {
     }
 }
 
-//run cron job every thirty minutes
-cron.schedule("0 */30 * * * *", ()=>{
-    console.log("_____________running cron job_-----------------");
-    main();
-});
+main();
