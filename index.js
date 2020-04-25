@@ -29,7 +29,7 @@ const couponsPage = "https://udemycoupon.learnviral.com/coupon-category/free100-
 //----------------------------------------------------------------------------------------------
 
 //initiate browser, open new page and go to url then return page
-async function getPage(url){
+async function getBroswer(){
     try{
         console.log("in get page");
         const browser = await puppeteer.launch({
@@ -39,21 +39,42 @@ async function getPage(url){
 
             ]
         });
-        const page = await browser.newPage();
-        await page.goto(url);
-        return page
+
+        return browser
     }catch (e) {
-        console.log("this error is coming from the getPage func", e);
+        console.log("this error is coming from the getBroswer func", e);
     }
 }
 
+//------------------------------------------------------------------------------------------------------
+//disable js, fonts, images
+async function interceptRequests(page){
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+        if (['image', 'stylesheet', 'font', 'script'].indexOf(request.resourceType()) !== -1) {
+            request.abort();
+        } else {
+            request.continue();
+        }
+    });
+}
+
+
+
+
+//------------------------------------------------------------------------------------------------------------------------
 //scrapes all urls from the coupons page
 async function scrapeFreeCouponUrls() {
     try {
-    const page = await getPage(couponsPage); //go to coupons page
-    console.log("Urls are being scraped");
-    const allUrls = await page.$$eval('.entry-title > a', links => links.map(link => link.href));
-    return allUrls;//return all urls from coupons page
+        const browser = await getBroswer();
+        const page = await browser.newPage();
+        await interceptRequests(page);
+        await page.goto(couponsPage,{ timeout: 30000});
+        console.log("Urls are being scraped");
+        const allUrls = await page.$$eval('.entry-title > a', links => links.map(link => link.href));
+        console.log('urls from first page',allUrls );
+        await browser.close();
+        return allUrls;//return all urls from coupons page
 
 
     } catch (e) {
@@ -72,20 +93,25 @@ const udemySchema = new mongoose.Schema({
     },
     udemyLink: {
         type: String,
-        required: [true, 'Username is required']
+        required: [true]
     },
     timeAndDuration: {
         type: String,
-        required: [true, 'Username is required']
+        required: [true]
     },
     Description: {
         type: String,
-        required: [true, 'Username is required']
+        required: [true]
     },
     tags: {
         type: String,
-        required: [true, 'Username is required']
+        required: [true]
     },
+    date:{
+        type: Date,
+        required: [true]
+    }
+
 
 });
 
@@ -103,8 +129,8 @@ async function createPost(firstLink,udemyLink,timeAndDuration, Description , tag
         udemyLink,
         timeAndDuration,
         Description,
-
-        tags
+        tags,
+        date : Date.now()
     }).save()
 }
 
@@ -165,7 +191,11 @@ async function determineLinkToGetUdemyLink(){
 async function gotoPageWithUdemyurl(url){
     try{
         //in individual link
-        const page = await getPage(url);
+        const browser = await getBroswer();
+        const page = await browser.newPage();
+        await interceptRequests(page);
+        await page.goto(url,{ timeout: 30000});
+
         //get udemy link
         const udemyLink = await page.$$eval('.link-holder > a', links => links.map(link => link.href));
         const timeDesc = await page.$eval('.text-box  p', (descs => descs.textContent));
@@ -174,7 +204,9 @@ async function gotoPageWithUdemyurl(url){
         const atags = await page.$$eval('.tags > a', links => links.map(link => link.innerHTML));//extracts tags
         const tags = atags.join(); // forms a single string
         const fullArray = [url,udemyLink, timeAndDuration, Description, tags];
-        toBeEmailed.push(fullArray)//appends an array of scraped data from url
+        await toBeEmailed.push(fullArray)//appends an array of scraped data from url
+        await browser.close();
+
         return fullArray;
     }catch (e) {
         console.log("this error is coming from the gotoPageWithUdemyurl func", e);
@@ -187,16 +219,16 @@ async function gotoPageWithUdemyurl(url){
 //stores links to mongo after getting back descriptions from the gotoPageWithUdemyurl func
 
 async function StoretoMongo(url) {
-try {
-    console.log("storing in mongo")
-    await connectMongo();
-    const fullLinks =await gotoPageWithUdemyurl(url);
-    await createPost(fullLinks[0],fullLinks[1][0],fullLinks[2],fullLinks[3],fullLinks[4]);
-    console.log("mongose round");
+    try {
+        console.log("storing in mongo")
+        await connectMongo();
+        const fullLinks =await gotoPageWithUdemyurl(url,{ timeout: 30000});
+        await createPost(fullLinks[0],fullLinks[1][0],fullLinks[2],fullLinks[3],fullLinks[4]);
+        console.log("mongose round");
 
-}catch (e) {
-    console.log("error in mongoose",e);
-}
+    }catch (e) {
+        console.log("error in mongoose",e);
+    }
 }
 
 
@@ -239,6 +271,10 @@ function sendmail(email){
     }
 };
 //----------------------------------------------------------------------
+//close browser
+
+
+//----------------------------------------------------------------------
 //where all the magic happens
 async function main() {
     try {
@@ -246,7 +282,7 @@ async function main() {
         for (let name of process.env.emailClients.split(',')) {
             console.log("Sending email to:", name);
             await sendmail(name);
-         }
+        }
         console.log("bye bye");
     }catch (e) {
         console.log("error in main",e);
@@ -261,5 +297,4 @@ main();
 //TODO:concurrency, multithreading, redis,
 //TODO:send email by desired category using tags
 //TODO:different templates different category
-//TODO:close browser
 
