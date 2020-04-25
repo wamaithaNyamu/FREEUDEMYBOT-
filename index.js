@@ -69,7 +69,7 @@ async function scrapeFreeCouponUrls() {
         const browser = await getBroswer();
         const page = await browser.newPage();
         await interceptRequests(page);
-        await page.goto(couponsPage,{ timeout: 30000});
+        await page.goto(couponsPage,{ timeout: 60000});
         console.log("Urls are being scraped");
         const allUrls = await page.$$eval('.entry-title > a', links => links.map(link => link.href));
         console.log('urls from first page',allUrls );
@@ -150,7 +150,7 @@ async function connectMongo(){
 //checks if given link is in mongo, returns a boolean. If true the link is in db if false not in db
 async function findIfFirstLinkinDB(firstLink) {
     console.log("checking if in db");
-    let connector = await connectMongo();
+   await connectMongo();
     return await POST.findOne({ firstLink });
 
 };
@@ -166,7 +166,7 @@ async function toBeSentEmails(){
             toBesent.push(url)
         }
     }
-    if(!toBesent){
+    if(toBesent.length===0){
         console.log("No new links, killing process");
         process.kill(0);
     }
@@ -194,7 +194,7 @@ async function gotoPageWithUdemyurl(url){
         const browser = await getBroswer();
         const page = await browser.newPage();
         await interceptRequests(page);
-        await page.goto(url,{ timeout: 30000});
+        await page.goto(url,{ timeout: 60000});
 
         //get udemy link
         const udemyLink = await page.$$eval('.link-holder > a', links => links.map(link => link.href));
@@ -297,4 +297,5 @@ main();
 //TODO:concurrency, multithreading, redis,
 //TODO:send email by desired category using tags
 //TODO:different templates different category
+
 
